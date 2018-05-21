@@ -4,6 +4,7 @@ export INSTALL_DISK="/dev/sdb"
 export BOOT_PARTITION=${INSTALL_DISK}1
 export ROOT_PARTITION=${INSTALL_DISK}2
 export HOME_PARTITION=${INSTALL_DISK}3
+mkdir -p /mnt/gentoo
 mount -o discard $ROOT_PARTITION /mnt/gentoo
 mount $BOOT_PARTITION /mnt/gentoo/boot
 mount -o discard $HOME_PARTITION /mnt/gentoo/home
@@ -58,6 +59,7 @@ mkfs.ext4 -F -E discard $HOME_PARTITION
 
 **Mounting**
 ```
+mkdir -p /mnt/gentoo
 mount -o discard $ROOT_PARTITION /mnt/gentoo
 mkdir -p /mnt/gentoo/boot
 mount $BOOT_PARTITION /mnt/gentoo/boot
@@ -105,5 +107,42 @@ eselect news read
 
 **World**
 ```
-emerge --ask --update --deep --newuse @world
+emerge --ask --update --deep --newuse @world  -j 4
+```
+
+**Miscs**
+```
+echo "Europe/Istanbul" > /etc/timezone
+emerge --config sys-libs/timezone-data
+echo "en_US.UTF-8 UTF-8" >>  /etc/locale.gen
+locale-gen
+echo "LANG=\"en_US.UTF-8\"" > /etc/env.d/02locale
+echo "LC_COLLATE=\"C\"" >> /etc/env.d/02locale
+env-update
+```
+**FSTAB**
+```
+BOOT_PARTUUID=$(blkid $BOOT_PARTITION | cut -d '"' -f 8)
+ROOT_PARTUUID=$(blkid $ROOT_PARTITION | cut -d '"' -f 8)
+HOME_PARTUUID=$(blkid $HOME_PARTITION | cut -d '"' -f 8)
+```
+
+
+**Kernel**
+```
+emerge --oneshot sys-kernel/ck-sources sys-kernel/linux-firmware sys-apps/pciutils sys-apps/usbutils -j 4
+#...
+
+make -j8
+make modules_install
+make install
+cp arch/x86/boot/bzImage /boot/EFI/gentoo/bzImage.efi
+```
+
+**Bootloader**
+```
+emerge --ask sys-boot/efibootmgr
+mount /sys/firmware/efi/efivars -o rw,remount
+efibootmgr -c -d /dev/sdb -p 1 -L "gentoo" -l "\efi\gentoo\bzImage.efi"
+mount /sys/firmware/efi/efivars -o ro,remount
 ```
